@@ -17,7 +17,8 @@
     "gulp": "^3.9.0",
     "gulp-util": "^3.0.3",
     "vinyl-source-stream": "^1.0.0",
-    "watchify": "^2.3.0"
+    "watchify": "^2.3.0",
+    "node-notifier": "^4.2.1"
   },
   "dependencies": {
     "jquery": "^2.1.4",

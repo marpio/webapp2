@@ -5,6 +5,74 @@ var babelify = require('babelify');
 var watchify = require('watchify');
 var exorcist = require('exorcist');
 var browserify = require('browserify');
+var child      = require('child_process');
+
+/* ----------------------------------------------------------------------------
+ * Application server
+ * ------------------------------------------------------------------------- */
+
+/*
+ * Build application server.
+ */
+gulp.task('server:build', function() {
+  process.chdir('server');
+  var build = child.spawnSync('go', ['build']);
+  if (build.stderr.length) {
+    var lines = build.stderr.toString()
+      .split('\n').filter(function(line) {
+        return line.length
+      });
+    for (var l in lines)
+      gutil.log(util.colors.red(
+        'Error (go install): ' + lines[l]
+      ));
+    notifier.notify({
+      title: 'Error (go install)',
+      message: lines
+    });
+  }
+  return build;
+});
+
+/*
+ * Restart application server.
+ */
+gulp.task('server:spawn', function() {
+  if (server)
+    server.kill();
+
+  /* Spawn application server */
+  server = child.spawn('server/server.exe');
+
+  /* Pretty print server log output */
+  server.stdout.on('data', function(data) {
+    var lines = data.toString().split('\n')
+    for (var l in lines)
+      if (lines[l].length)
+        gutil.log(lines[l]);
+  });
+
+  /* Print errors to stdout */
+  server.stderr.on('data', function(data) {
+    process.stdout.write(data.toString());
+  });
+});
+
+/*
+ * Watch source for changes and restart application server.
+ */
+gulp.task('server:watch', function() {
+  /* Rebuild and restart application server */
+  gulp.watch([
+    '*/**/*.go',
+  ], [
+    'server:build',
+    'server:spawn'
+  ], 'server');
+});
+
+
+
 
 // Input file.
 watchify.args.debug = true;
@@ -40,7 +108,8 @@ gulp.task('bundle', function() {
   return bundle();
 });
 
-/**
- * First bundle
- */
-gulp.task('default', ['bundle']);
+gulp.task('build', [
+  'server:build'
+]);
+
+gulp.task('default', ['build', 'bundle']);

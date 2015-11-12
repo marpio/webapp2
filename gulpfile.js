@@ -6,6 +6,7 @@ var watchify = require('watchify');
 var exorcist = require('exorcist');
 var browserify = require('browserify');
 var child      = require('child_process');
+var sync       = require('gulp-sync')(gulp).sync;
 
 /* ----------------------------------------------------------------------------
  * Application server
@@ -15,15 +16,14 @@ var child      = require('child_process');
  * Build application server.
  */
 gulp.task('server:build', function() {
-  process.chdir('server');
-  var build = child.spawnSync('go', ['build']);
+  var build = child.spawnSync('go', ['build'], {cwd:'server'});
   if (build.stderr.length) {
     var lines = build.stderr.toString()
       .split('\n').filter(function(line) {
         return line.length
       });
     for (var l in lines)
-      gutil.log(util.colors.red(
+      gutil.log(gutil.colors.red(
         'Error (go install): ' + lines[l]
       ));
     notifier.notify({
@@ -33,16 +33,16 @@ gulp.task('server:build', function() {
   }
   return build;
 });
-
+var server = undefined;
 /*
  * Restart application server.
  */
 gulp.task('server:spawn', function() {
-  if (server)
+  if (server != undefined)
     server.kill();
 
   /* Spawn application server */
-  server = child.spawn('server/server.exe');
+  server = child.spawn('server.exe', [], {cwd:'server'});
 
   /* Pretty print server log output */
   server.stdout.on('data', function(data) {
@@ -61,16 +61,15 @@ gulp.task('server:spawn', function() {
 /*
  * Watch source for changes and restart application server.
  */
-gulp.task('server:watch', function() {
-  /* Rebuild and restart application server */
-  gulp.watch([
-    '*/**/*.go',
-  ], [
-    'server:build',
-    'server:spawn'
-  ], 'server');
-});
-
+ gulp.task('server:watch', function() {
+   /* Rebuild and restart application server */
+   gulp.watch([
+     '*/**/*.go',
+   ], sync([
+     'server:build',
+     'server:spawn'
+   ], 'server'));
+ });
 
 
 
@@ -98,7 +97,7 @@ function bundle() {
     })
     //.pipe(exorcist('public/js/dist/bundle.js.map'))
     .pipe(source('bundle.js'))
-    .pipe(gulp.dest('./server/public/js/dist/app'));
+    .pipe(gulp.dest('.server/public/js/dist/app'));
 }
 
 /**
@@ -111,5 +110,13 @@ gulp.task('bundle', function() {
 gulp.task('build', [
   'server:build'
 ]);
+gulp.task('watch', [
+  'server:build'
+], function() {
+  return gulp.start([
+    'server:watch',
+    'server:spawn'
+  ]);
+});
 
-gulp.task('default', ['build', 'bundle']);
+gulp.task('default', ['bundle', 'build']);
